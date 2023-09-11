@@ -45,9 +45,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 include(CheckFunctionExistsMayNeedLibrary)
 include(CheckNonblockingSocketSupport)
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.1...3.15.0)
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+#set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 project(libssh2 C)
 
@@ -60,6 +60,27 @@ add_feature_info("Static library" BUILD_STATIC_LIBS
 option(BUILD_SHARED_LIBS "Build Shared Libraries" ON)
 add_feature_info("Shared library" BUILD_SHARED_LIBS
   "creating libssh2 shared library (.so/.dll)")
+
+option(LIBSSH2_ENABLE_EXPORT_TARGET "to enable cmake export target" OFF)
+option(LIBSSH2_WITH_DISABLED_TEST_APPS "Build libssh2 with disabled test apps." OFF)
+option(LIBSSH2_WITH_SHARED_LIBRARIES "Build shared version of the libssh2 library." OFF)
+option(LIBSSH2_WITH_SHARED_ZLIB "Build libssh2 with shared version of Zlib." OFF)
+option(LIBSSH2_WITH_ZLIB "Build libssh2 with Zlib." OFF)
+
+if(LIBSSH2_WITH_SHARED_LIBRARIES)
+  set(BUILD_SHARED_LIBS ON)
+  set(BUILD_STATIC_LIBS OFF)
+else()
+  set(BUILD_SHARED_LIBS OFF)
+  set(BUILD_STATIC_LIBS ON)
+endif()
+if(LIBSSH2_WITH_ZLIB)
+  if(LIBSSH2_WITH_SHARED_ZLIB)
+    set(ZLIB_USE_STATIC_LIBS OFF)
+  else()
+    set(ZLIB_USE_STATIC_LIBS ON)
+  endif()
+endif()
 
 # Parse version
 
@@ -112,6 +133,10 @@ endif()
 
 option(BUILD_EXAMPLES "Build libssh2 examples" ON)
 option(BUILD_TESTING "Build libssh2 test suite" ON)
+if(LIBSSH2_WITH_DISABLED_TEST_APPS)
+  set(BUILD_EXAMPLES OFF)
+  set(BUILD_TESTING OFF)
+endif()
 
 if(NOT BUILD_STATIC_LIBS AND NOT BUILD_SHARED_LIBS)
   set(BUILD_STATIC_LIBS ON)
@@ -294,61 +319,80 @@ endif()
 
 if(CRYPTO_BACKEND STREQUAL "OpenSSL" OR NOT CRYPTO_BACKEND)
 
-  find_package(OpenSSL ${SPECIFIC_CRYPTO_REQUIREMENT})
-
+  find_package(SiblingOpenSSL)
   if(OPENSSL_FOUND)
     set(CRYPTO_BACKEND "OpenSSL")
     set(CRYPTO_BACKEND_DEFINE "LIBSSH2_OPENSSL")
-    set(CRYPTO_BACKEND_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
+    set(CRYPTO_BACKEND_INCLUDE_DIR ${OPENSSL_INCLUDE_DIRS})
     list(APPEND LIBRARIES ${OPENSSL_LIBRARIES})
-    list(APPEND PC_REQUIRES_PRIVATE libssl libcrypto)
+    list(APPEND PC_REQUIRES_PRIVATE ${OPENSSL_LIBRARIES})
 
-    if(WIN32)
-      # Statically linking to OpenSSL requires crypt32 for some Windows APIs.
-      # This should really be handled by FindOpenSSL.cmake.
-      list(APPEND LIBRARIES crypt32 bcrypt)
-      list(APPEND PC_LIBS -lcrypt32 -lbcrypt)
-
-      #set(CMAKE_FIND_DEBUG_MODE TRUE)
-
-      find_file(DLL_LIBCRYPTO
-        NAMES crypto.dll
-          libcrypto-1_1.dll libcrypto-1_1-x64.dll
-          libcrypto-3.dll libcrypto-3-x64.dll
-        HINTS ${_OPENSSL_ROOT_HINTS} PATHS ${_OPENSSL_ROOT_PATHS}
-        PATH_SUFFIXES bin NO_DEFAULT_PATH)
-      if(DLL_LIBCRYPTO)
-        message(STATUS "Found libcrypto DLL: ${DLL_LIBCRYPTO}")
-      else()
-        message(WARNING
-          "Unable to find OpenSSL libcrypto DLL, executables may not run")
-      endif()
-
-      find_file(DLL_LIBSSL
-        NAMES ssl.dll
-          libssl-1_1.dll libssl-1_1-x64.dll
-          libssl-3.dll libssl-3-x64.dll
-        HINTS ${_OPENSSL_ROOT_HINTS} PATHS ${_OPENSSL_ROOT_PATHS}
-        PATH_SUFFIXES bin NO_DEFAULT_PATH)
-      if(DLL_LIBSSL)
-        message(STATUS "Found libssl DLL: ${DLL_LIBSSL}")
-      else()
-        message(WARNING
-          "Unable to find OpenSSL libssl DLL, executables may not run")
-      endif()
-
-      #set(CMAKE_FIND_DEBUG_MODE FALSE)
-
-      if(DLL_LIBCRYPTO AND DLL_LIBSSL)
-        list(APPEND _RUNTIME_DEPENDENCIES ${DLL_LIBCRYPTO} ${DLL_LIBSSL})
+    if(LIBSSH2_WITH_ZLIB)
+      find_package(SiblingZLIB)
+      if(ZLIB_FOUND)
+        list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
+        list(APPEND PC_REQUIRES_PRIVATE ${ZLIB_LIBRARIES})
       endif()
     endif()
+  else()
+    find_package(OpenSSL ${SPECIFIC_CRYPTO_REQUIREMENT})
 
-    find_package(ZLIB)
+    if(OPENSSL_FOUND)
+      set(CRYPTO_BACKEND "OpenSSL")
+      set(CRYPTO_BACKEND_DEFINE "LIBSSH2_OPENSSL")
+      set(CRYPTO_BACKEND_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
+      list(APPEND LIBRARIES ${OPENSSL_LIBRARIES})
+      list(APPEND PC_REQUIRES_PRIVATE libssl libcrypto)
 
-    if(ZLIB_FOUND)
-      list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
-      list(APPEND PC_REQUIRES_PRIVATE zlib)
+      if(WIN32)
+        # Statically linking to OpenSSL requires crypt32 for some Windows APIs.
+        # This should really be handled by FindOpenSSL.cmake.
+        list(APPEND LIBRARIES crypt32 bcrypt)
+        list(APPEND PC_LIBS -lcrypt32 -lbcrypt)
+
+        #set(CMAKE_FIND_DEBUG_MODE TRUE)
+
+        find_file(DLL_LIBCRYPTO
+          NAMES crypto.dll
+            libcrypto-1_1.dll libcrypto-1_1-x64.dll
+            libcrypto-3.dll libcrypto-3-x64.dll
+          HINTS ${_OPENSSL_ROOT_HINTS} PATHS ${_OPENSSL_ROOT_PATHS}
+          PATH_SUFFIXES bin NO_DEFAULT_PATH)
+        if(DLL_LIBCRYPTO)
+          message(STATUS "Found libcrypto DLL: ${DLL_LIBCRYPTO}")
+        else()
+          message(WARNING
+            "Unable to find OpenSSL libcrypto DLL, executables may not run")
+        endif()
+
+        find_file(DLL_LIBSSL
+          NAMES ssl.dll
+            libssl-1_1.dll libssl-1_1-x64.dll
+            libssl-3.dll libssl-3-x64.dll
+          HINTS ${_OPENSSL_ROOT_HINTS} PATHS ${_OPENSSL_ROOT_PATHS}
+          PATH_SUFFIXES bin NO_DEFAULT_PATH)
+        if(DLL_LIBSSL)
+          message(STATUS "Found libssl DLL: ${DLL_LIBSSL}")
+        else()
+          message(WARNING
+            "Unable to find OpenSSL libssl DLL, executables may not run")
+        endif()
+
+        #set(CMAKE_FIND_DEBUG_MODE FALSE)
+
+        if(DLL_LIBCRYPTO AND DLL_LIBSSL)
+          list(APPEND _RUNTIME_DEPENDENCIES ${DLL_LIBCRYPTO} ${DLL_LIBSSL})
+        endif()
+      endif()
+
+      if(LIBSSH2_WITH_ZLIB)
+        find_package(ZLIB)
+
+        if(ZLIB_FOUND)
+          list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
+          list(APPEND PC_REQUIRES_PRIVATE zlib)
+        endif()
+      endif()
     endif()
   endif()
 endif()

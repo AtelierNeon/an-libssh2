@@ -51,14 +51,25 @@ endif()
 option(ENABLE_ZLIB_COMPRESSION "Use zlib for compression")
 add_feature_info(Compression ENABLE_ZLIB_COMPRESSION
   "using zlib for compression")
+if(LIBSSH2_WITH_ZLIB)
+  set(ENABLE_ZLIB_COMPRESSION ON)
+endif()
 if(ENABLE_ZLIB_COMPRESSION)
-  find_package(ZLIB REQUIRED)
-
-  list(APPEND libssh2_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
-  list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
-  list(APPEND PC_REQUIRES_PRIVATE zlib)
+  find_package(SiblingZLIB)
   if(ZLIB_FOUND)
+    list(APPEND libssh2_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+    list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
+    list(APPEND PC_REQUIRES_PRIVATE ${ZLIB_LIBRARIES})
     list(APPEND libssh2_DEFINITIONS LIBSSH2_HAVE_ZLIB)
+  else()
+    find_package(ZLIB REQUIRED)
+
+    list(APPEND libssh2_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+    list(APPEND LIBRARIES ${ZLIB_LIBRARIES})
+    list(APPEND PC_REQUIRES_PRIVATE zlib)
+    if(ZLIB_FOUND)
+      list(APPEND libssh2_DEFINITIONS LIBSSH2_HAVE_ZLIB)
+    endif()
   endif()
 endif()
 
@@ -161,15 +172,17 @@ set(RUNTIME_DEPENDENCIES ${_RUNTIME_DEPENDENCIES} CACHE INTERNAL
 
 # Package config
 
-## During package installation, install Libssh2Config.cmake
-install(EXPORT Libssh2Config
-  NAMESPACE Libssh2::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libssh2)
+if(LIBSSH2_ENABLE_EXPORT_TARGET)
+  ## During package installation, install Libssh2Config.cmake
+  install(EXPORT Libssh2Config
+    NAMESPACE Libssh2::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libssh2)
 
-## During build, register directly from build tree
-# create Libssh2Config.cmake
-export(TARGETS ${libssh2_export} NAMESPACE Libssh2:: FILE Libssh2Config.cmake)
-export(PACKAGE Libssh2) # register it
+  ## During build, register directly from build tree
+  # create Libssh2Config.cmake
+  export(TARGETS ${libssh2_export} NAMESPACE Libssh2:: FILE Libssh2Config.cmake)
+  export(PACKAGE Libssh2) # register it
+endif()
 
 ## Export a .pc file for client projects not using CMaek
 if(PC_REQUIRES_PRIVATE)
@@ -185,7 +198,7 @@ set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix "\${prefix}")
 set(libdir "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
 set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
-configure_file(${CMAKE_SOURCE_DIR}/libssh2.pc.in libssh2.pc @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/libssh2.pc.in libssh2.pc @ONLY)
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/libssh2.pc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
