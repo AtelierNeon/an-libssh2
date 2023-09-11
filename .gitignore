@@ -1,0 +1,11 @@
+# folders
+.idea/
+build/
+dist/
+temp/
+
+# files
+*.log
+*.tmp
+*.userprefs
+.DS_Store
