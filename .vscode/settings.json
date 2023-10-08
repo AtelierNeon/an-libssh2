@@ -2,11 +2,11 @@
     "cmake.buildDirectory": "${workspaceFolder}/build/vscode",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.configureSettings": {
-        "LIBSSH2_WITH_DISABLED_TEST_APPS": "OFF",
         "LIBSSH2_WITH_ZLIB": "ON",
+        "LIBSSH2_WITHOUT_TEST_APPS": "OFF",
         "OPENSSL_WITH_DEPRECATED_CIPHERS": "ON",
-        "OPENSSL_WITH_DISABLED_APPS": "ON",
         "OPENSSL_WITH_ZLIB": "ON",
-        "ZLIB_WITH_DISABLED_TEST_APPS": "ON"
+        "OPENSSL_WITHOUT_APPS": "ON",
+        "ZLIB_WITHOUT_TEST_APPS": "ON"
     }
 }
